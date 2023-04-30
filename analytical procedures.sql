@@ -1,3 +1,45 @@
+---------
+CREATE OR REPLACE FUNCTION get_hotel_reservations_by_city(city VARCHAR(100))
+RETURNS TABLE(
+  hotel_name VARCHAR(100),
+  date DATE,
+  nights INTEGER,
+  price DECIMAL(10, 2),
+  room_type VARCHAR(50)
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    h.name AS hotel_name,
+    hr.date,
+    hr.nights,
+    hr.prices,
+    r.room_type
+  FROM
+    hotel_reservations hr
+    INNER JOIN rooms r ON hr.room_id = r.room_id
+    INNER JOIN hotels h ON r.hotel_id = h.hotel_id
+  WHERE
+    h.city = get_hotel_reservations_by_city.city;
+END;
+$$ LANGUAGE plpgsql;
+----------
+
+SELECT * FROM get_hotel_reservations_by_city('Perry');
+
+
+----------
+SELECT c.name AS company_name,
+  r.date,
+  ROUND(r.prices / r.duration, 2) AS price_per_day,
+  c.city
+FROM rent_reservations r
+  INNER JOIN cars car ON r.car_id = car.car_id
+  INNER JOIN car_rental_companies c ON car.car_company_id = c.car_company_id
+ORDER BY c.city, c.name, r.date;
+----------
+
+
 ---------- Calculate the average rating and total revenue for each hotel, and order by descending total revenue:
 WITH hotel_avg_rating AS (
   SELECT
@@ -283,26 +325,54 @@ WITH guest_activity_count AS (
 ),
 activity_stats AS (
   SELECT
-    SUM(CASE WHEN hotel_count > 0 AND rent_count = 0 AND flight_count = 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS hotel_only_percentage,
-    SUM(CASE WHEN hotel_count = 0 AND rent_count > 0 AND flight_count = 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS rent_only_percentage,
-    SUM(CASE WHEN hotel_count = 0 AND rent_count = 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS flight_only_percentage,
-    SUM(CASE WHEN hotel_count > 0 AND rent_count > 0 AND flight_count = 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS hotel_rent_percentage,
-    SUM(CASE WHEN hotel_count > 0 AND rent_count = 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS hotel_flight_percentage,
-    SUM(CASE WHEN hotel_count = 0 AND rent_count > 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS rent_flight_percentage,
-    SUM(CASE WHEN hotel_count > 0 AND rent_count > 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS all_activities_percentage
+    'Hotel Only' AS activity_type,
+    SUM(CASE WHEN hotel_count > 0 AND rent_count = 0 AND flight_count = 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100 AS percentage
+  FROM
+    guest_activity_count
+  UNION ALL
+  SELECT
+    'Rent Only',
+    SUM(CASE WHEN hotel_count = 0 AND rent_count > 0 AND flight_count = 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100
+  FROM
+    guest_activity_count
+  UNION ALL
+  SELECT
+    'Flight Only',
+    SUM(CASE WHEN hotel_count = 0 AND rent_count = 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100
+  FROM
+    guest_activity_count
+  UNION ALL
+  SELECT
+    'Hotel & Rent',
+    SUM(CASE WHEN hotel_count > 0 AND rent_count > 0 AND flight_count = 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100
+  FROM
+    guest_activity_count
+  UNION ALL
+  SELECT
+    'Hotel & Flight',
+    SUM(CASE WHEN hotel_count > 0 AND rent_count = 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100
+  FROM
+    guest_activity_count
+  UNION ALL
+  SELECT
+    'Rent & Flight',
+    SUM(CASE WHEN hotel_count = 0 AND rent_count > 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100
+  FROM
+    guest_activity_count
+  UNION ALL
+  SELECT
+    'All Activities',
+    SUM(CASE WHEN hotel_count > 0 AND rent_count > 0 AND flight_count > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT * 100
   FROM
     guest_activity_count
 )
 SELECT
-  hotel_only_percentage,
-  rent_only_percentage,
-  flight_only_percentage,
-  hotel_rent_percentage,
-  hotel_flight_percentage,
-  rent_flight_percentage,
-  all_activities_percentage
+  activity_type,
+  percentage
 FROM
-  activity_stats;
+  activity_stats
+ORDER BY
+  activity_type;
 ----------
 
 
