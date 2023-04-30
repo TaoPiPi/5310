@@ -376,10 +376,42 @@ ORDER BY
 ----------
 
 
+----------Find cheapest of date/city
+CREATE OR REPLACE FUNCTION get_cheapest_hotel_reservation(p_date DATE, p_city VARCHAR)
+RETURNS TABLE (
+  reservation_id INT,
+  hotel_name VARCHAR,
+  city VARCHAR,
+  reservation_date DATE,
+  nights INT,
+  prices DECIMAL(10,2),
+  room_type VARCHAR
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    hr.id AS reservation_id,
+    h.name AS hotel_name,
+    h.city,
+    hr.date,
+    hr.nights,
+    hr.prices,
+    r.room_type
+  FROM
+    hotel_reservations hr
+    INNER JOIN rooms r ON hr.room_id = r.room_id
+    INNER JOIN hotels h ON r.hotel_id = h.hotel_id
+  WHERE
+    hr.date = p_date AND h.city = p_city
+  ORDER BY
+    hr.prices
+  LIMIT 1;
+END;
+$$ LANGUAGE plpgsql;
+----------
 
 
-
-
+SELECT * FROM get_cheapest_hotel_reservation('2021-5-10','Paola');
 
 
 
